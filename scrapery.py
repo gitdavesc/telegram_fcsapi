@@ -1,12 +1,33 @@
 import requests
 import os
 import json
+from datetime import datetime
 
 API_KEY = os.environ["FCS_API_KEY"]
 TOKEN = os.environ["TELEGRAM_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
 ESTADO_FILE = "estado.json"
+
+def es_feriado_peru():
+try:
+año = datetime.now().year
+hoy = datetime.now().strftime("%Y-%m-%d")
+
+```
+    r = requests.get(
+        f"https://date.nager.at/api/v3/PublicHolidays/{año}/PE",
+        timeout=20
+    )
+
+    feriados = r.json()
+
+    return any(f["date"] == hoy for f in feriados)
+
+except Exception as e:
+    print(f"No se pudo verificar feriados: {e}")
+    return False
+```
 
 def obtener_par(symbol):
 r = requests.get(
@@ -23,6 +44,9 @@ r.raise_for_status()
 
 data = r.json()
 
+if "response" not in data or len(data["response"]) == 0:
+    raise Exception(f"No se obtuvo información para {symbol}")
+
 return float(data["response"][0]["c"])
 ```
 
@@ -35,10 +59,14 @@ return {}
 
 def guardar_estado(data):
 with open(ESTADO_FILE, "w") as f:
-json.dump(data, f)
+json.dump(data, f, indent=2)
 
 def variacion_pct(actual, anterior):
 return ((actual - anterior) / anterior) * 100
+
+if es_feriado_peru():
+print("Feriado en Perú. No se consulta FCS API.")
+exit()
 
 estado = cargar_estado()
 
@@ -52,28 +80,38 @@ mensajes = []
 for par in pares:
 
 ```
-actual = obtener_par(par)
+try:
+    actual = obtener_par(par)
 
-if par not in estado:
-    estado[par] = actual
-    continue
+    if par not in estado:
+        estado[par] = actual
+        print(f"Inicializando {par} = {actual}")
+        continue
 
-anterior = estado[par]
+    anterior = estado[par]
 
-cambio = variacion_pct(actual, anterior)
+    cambio = variacion_pct(actual, anterior)
 
-if abs(cambio) >= 1:
-
-    emoji = "📈" if cambio > 0 else "📉"
-
-    mensajes.append(
-        f"{emoji} {par}\n"
-        f"Anterior: {anterior}\n"
-        f"Actual: {actual}\n"
-        f"Variación: {cambio:.2f}%"
+    print(
+        f"{par} | Anterior={anterior} | "
+        f"Actual={actual} | Cambio={cambio:.2f}%"
     )
 
-    estado[par] = actual
+    if abs(cambio) >= 1:
+
+        emoji = "📈" if cambio > 0 else "📉"
+
+        mensajes.append(
+            f"{emoji} {par}\n"
+            f"Anterior: {anterior}\n"
+            f"Actual: {actual}\n"
+            f"Variación: {cambio:.2f}%"
+        )
+
+        estado[par] = actual
+
+except Exception as e:
+    print(f"Error procesando {par}: {e}")
 ```
 
 guardar_estado(estado)
@@ -92,6 +130,7 @@ requests.post(
     timeout=20
 )
 
+print("Mensaje enviado:")
 print(texto)
 ```
 
