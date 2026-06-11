@@ -43,16 +43,10 @@ def obtener_par(symbol):
 
     data = r.json()
 
-    # TEMPORAL: mostrar la respuesta completa de FCS API
-    print(f"\n===== RESPUESTA FCS API PARA {symbol} =====")
-    print(json.dumps(data, indent=2, ensure_ascii=False))
-    print("=========================================\n")
-
     if "response" not in data or len(data["response"]) == 0:
         raise Exception(f"No se obtuvo información para {symbol}")
 
-    # Mantengo tu lógica original para identificar el campo correcto
-    return float(data["response"][0]["c"])
+    return float(data["response"][0]["active"]["c"])
 
 
 def cargar_estado():
