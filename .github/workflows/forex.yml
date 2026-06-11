@@ -36,4 +36,4 @@ steps:
       git add estado.json
       git diff --staged --quiet || git commit -m "Actualizar estado"
       git push
-```
+
