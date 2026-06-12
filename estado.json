@@ -1,4 +1,7 @@
 {
-  "USDPEN": 3.394,
-  "CLPPEN": 0.00375
+  "fecha": "2026-06-12",
+  "referencia": {
+    "USDPEN": 3.3988,
+    "CLPPEN": 0.003742
+  }
 }
