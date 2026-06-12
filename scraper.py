@@ -16,7 +16,6 @@ try:
 año = datetime.now().year
 hoy = datetime.now().strftime("%Y-%m-%d")
 
-```
     r = requests.get(
         f"https://date.nager.at/api/v3/PublicHolidays/{año}/PE",
         timeout=20
@@ -29,7 +28,7 @@ hoy = datetime.now().strftime("%Y-%m-%d")
 except Exception as e:
     print(f"No se pudo verificar feriados: {e}")
     return False
-```
+
 
 def obtener_par(symbol):
 r = requests.get(
@@ -41,7 +40,7 @@ params={
 timeout=20
 )
 
-```
+
 r.raise_for_status()
 
 data = r.json()
@@ -50,7 +49,7 @@ if "response" not in data or len(data["response"]) == 0:
     raise Exception(f"No hay datos para {symbol}")
 
 return float(data["response"][0]["active"]["c"])
-```
+
 
 def cargar_estado():
 try:
@@ -92,7 +91,7 @@ primera_corrida = not estado.get("primer_envio_realizado", False)
 
 for ticker, nombre in pares.items():
 
-```
+
 try:
 
     actual = obtener_par(ticker)
@@ -142,7 +141,7 @@ guardar_estado(estado)
 
 if mensajes:
 
-```
+
 texto = "\n\n".join(mensajes)
 
 r1 = requests.post(
@@ -168,7 +167,7 @@ r2 = requests.post(
 print("Canal:", r2.text)
 
 print(texto)
-```
+
 
 else:
 
