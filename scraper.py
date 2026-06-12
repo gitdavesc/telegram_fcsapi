@@ -44,7 +44,7 @@ def obtener_par(symbol):
     data = r.json()
 
     if "response" not in data or len(data["response"]) == 0:
-        raise Exception(f"No se obtuvo información para {symbol}")
+        raise Exception(f"No hay datos para {symbol}")
 
     return float(data["response"][0]["active"]["c"])
 
@@ -53,6 +53,7 @@ def cargar_estado():
     try:
         with open(ESTADO_FILE, "r") as f:
             return json.load(f)
+
     except:
         return {}
 
@@ -62,62 +63,95 @@ def guardar_estado(data):
         json.dump(data, f, indent=2)
 
 
-def variacion_pct(actual, anterior):
-    return ((actual - anterior) / anterior) * 100
+def variacion_pct(actual, base):
+    return ((actual - base) / base) * 100
 
 
+# BLOQUEAR FERIADOS
 if es_feriado_peru():
-    print("Feriado en Perú. No se consulta FCS API.")
+    print("Feriado Perú. No se ejecuta.")
     exit()
+
 
 estado = cargar_estado()
 
-pares = [
-    "USDPEN",
-    "CLPPEN"
-]
+hoy = datetime.now().strftime("%Y-%m-%d")
+
+
+# NUEVO DÍA: nueva referencia
+if estado.get("fecha") != hoy:
+    estado = {
+        "fecha": hoy,
+        "referencia": {}
+    }
+
+
+pares = {
+    "USDPEN": "Dólar estadounidense / Sol peruano",
+    "CLPPEN": "Peso chileno / Sol peruano"
+}
+
 
 mensajes = []
 
-for par in pares:
+
+# primera ejecución del día
+primera_corrida = len(estado["referencia"]) == 0
+
+
+for ticker, nombre in pares.items():
+
     try:
-        actual = obtener_par(par)
 
-        if par not in estado:
-            estado[par] = actual
-            print(f"Inicializando {par} = {actual}")
-            continue
+        actual = obtener_par(ticker)
 
-        anterior = estado[par]
 
-        cambio = variacion_pct(actual, anterior)
+        if primera_corrida:
 
-        print(
-            f"{par} | Anterior={anterior} | "
-            f"Actual={actual} | Cambio={cambio:.2f}%"
-        )
-
-        if abs(cambio) >= 1:
-
-            emoji = "📈" if cambio > 0 else "📉"
+            estado["referencia"][ticker] = actual
 
             mensajes.append(
-                f"{emoji} {par}\n"
-                f"Anterior: {anterior}\n"
-                f"Actual: {actual}\n"
-                f"Variación: {cambio:.2f}%"
+                f"💱 {ticker} ({nombre})\n"
+                f"Actual: {actual}"
             )
 
-            estado[par] = actual
+
+        else:
+
+            base = estado["referencia"][ticker]
+
+            cambio = variacion_pct(actual, base)
+
+
+            print(
+                f"{ticker} | Base={base} | "
+                f"Actual={actual} | Cambio={cambio:.2f}%"
+            )
+
+
+            if abs(cambio) >= 1:
+
+                emoji = "📈" if cambio > 0 else "📉"
+
+
+                mensajes.append(
+                    f"{emoji} {ticker} ({nombre})\n"
+                    f"Actual: {actual}\n"
+                    f"Hoy fuerte cambio: {cambio:.2f}%"
+                )
+
 
     except Exception as e:
-        print(f"Error procesando {par}: {e}")
+        print(f"Error en {ticker}: {e}")
+
 
 guardar_estado(estado)
+
 
 if mensajes:
 
     texto = "\n\n".join(mensajes)
+
 
     requests.post(
         f"https://api.telegram.org/bot{TOKEN}/sendMessage",
@@ -128,8 +162,11 @@ if mensajes:
         timeout=20
     )
 
+
     print("Mensaje enviado:")
     print(texto)
 
+
 else:
-    print("Sin variaciones >= 1%")
+
+    print("Sin cambio >= 1%")
