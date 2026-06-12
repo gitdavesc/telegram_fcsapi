@@ -1,172 +1,38 @@
-import requests
-import os
-import json
-from datetime import datetime
-
-API_KEY = os.environ["FCS_API_KEY"]
-TOKEN = os.environ["TELEGRAM_TOKEN"]
-CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-
-ESTADO_FILE = "estado.json"
-
-
-def es_feriado_peru():
-    try:
-        año = datetime.now().year
-        hoy = datetime.now().strftime("%Y-%m-%d")
-
-        r = requests.get(
-            f"https://date.nager.at/api/v3/PublicHolidays/{año}/PE",
-            timeout=20
-        )
-
-        feriados = r.json()
-
-        return any(f["date"] == hoy for f in feriados)
-
-    except Exception as e:
-        print(f"No se pudo verificar feriados: {e}")
-        return False
-
-
-def obtener_par(symbol):
-    r = requests.get(
-        "https://api-v4.fcsapi.com/forex/latest",
-        params={
-            "symbol": symbol,
-            "access_key": API_KEY
-        },
-        timeout=20
-    )
-
-    r.raise_for_status()
-
-    data = r.json()
-
-    if "response" not in data or len(data["response"]) == 0:
-        raise Exception(f"No hay datos para {symbol}")
-
-    return float(data["response"][0]["active"]["c"])
-
-
-def cargar_estado():
-    try:
-        with open(ESTADO_FILE, "r") as f:
-            return json.load(f)
-
-    except:
-        return {}
-
-
-def guardar_estado(data):
-    with open(ESTADO_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def variacion_pct(actual, base):
-    return ((actual - base) / base) * 100
-
-
-# BLOQUEAR FERIADOS
-if es_feriado_peru():
-    print("Feriado Perú. No se ejecuta.")
-    exit()
-
-
-estado = cargar_estado()
-
-hoy = datetime.now().strftime("%Y-%m-%d")
-
-
-# NUEVO DÍA: nueva referencia
-if estado.get("fecha") != hoy:
-    estado = {
-        "fecha": hoy,
-        "referencia": {}
-    }
-
-
-pares = {
-    "USDPEN": "Dólar estadounidense / Sol peruano",
-    "CLPPEN": "Peso chileno / Sol peruano"
-}
-
-
-mensajes = []
-
-
-# primera ejecución del día
-primera_corrida = len(estado["referencia"]) == 0
-
-
-for ticker, nombre in pares.items():
-
-    try:
-
-        actual = obtener_par(ticker)
-
-
-        if primera_corrida:
-
-            estado["referencia"][ticker] = actual
-
-            mensajes.append(
-                f"💱 {ticker} ({nombre})\n"
-                f"Actual: {actual}"
-            )
-
-
-        else:
-
-            base = estado["referencia"][ticker]
-
-            cambio = variacion_pct(actual, base)
-
-
-            print(
-                f"{ticker} | Base={base} | "
-                f"Actual={actual} | Cambio={cambio:.2f}%"
-            )
-
-
-            if abs(cambio) >= 1:
-
-                emoji = "📈" if cambio > 0 else "📉"
-
-
-                mensajes.append(
-                    f"{emoji} {ticker} ({nombre})\n"
-                    f"Actual: {actual}\n"
-                    f"Hoy fuerte cambio: {cambio:.2f}%"
-                )
-
-
-    except Exception as e:
-        print(f"Error en {ticker}: {e}")
-
-
-guardar_estado(estado)
-
-
-if mensajes:
-
-    texto = "\n\n".join(mensajes)
-
-
-    requests.post(
-        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-        data={
-            "chat_id": CHAT_ID,
-            "text": texto
-        },
-        timeout=20
-    )
-
-
-    print("Mensaje enviado:")
-    print(texto)
-
-
-else:
-
-    print("Sin cambio >= 1%")
+name: Forex Alert
+
+on:
+  schedule:
+    - cron: '0,30 14-19 * * 1-5'
+    - cron: '0 20 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - run: python scraper.py
+        env:
+          FCS_API_KEY: ${{ secrets.FCS_API_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Commit estado.json
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add estado.json
+          git diff --staged --quiet || git commit -m "Actualizar estado"
+          git push
