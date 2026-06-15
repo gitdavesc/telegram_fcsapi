@@ -1,5 +1,8 @@
 {
   "fecha": "2026-06-15",
   "primer_envio_realizado": true,
-  "referencia": {}
+  "referencia": {
+    "USDPEN": 3.3991,
+    "CLPPEN": 0.003804
+  }
 }
