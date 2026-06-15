@@ -1,8 +1,5 @@
 {
-  "fecha": "2026-06-12",
-  "referencia": {
-    "USDPEN": 3.3941,
-    "CLPPEN": 0.003764
-  },
-  "primer_envio_realizado": true
+  "fecha": "2026-06-15",
+  "primer_envio_realizado": true,
+  "referencia": {}
 }
